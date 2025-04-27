@@ -20,9 +20,8 @@ file(GLOB SOURCES
 
 add_library(Deexcitation ${SOURCES})
 
-target_link_libraries(Deexcitation FermiBreakUp ${Geant4_LIBRARIES} COLA)
-
-target_include_directories(Deexcitation PUBLIC ${Geant4_INCLUDE_DIR} ${PROJECT_SOURCE_DIR})
+target_link_libraries(Deexcitation COLA FermiBreakUp ${Geant4_LIBRARIES})
+target_include_directories(Deexcitation PUBLIC ${Geant4_INCLUDE_DIR})
 
 target_compile_options(Deexcitation PRIVATE -Wall -Werror -Wfloat-conversion -Wextra -Wpedantic)
 

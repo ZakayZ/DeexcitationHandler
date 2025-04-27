@@ -9,3 +9,5 @@ add_subdirectory(${LIB_PATH} ${CMAKE_BINARY_DIR}/Deexcitation)
 add_executable(Runner main.cpp)
 target_link_libraries(Runner FermiBreakUp Deexcitation)
 target_include_directories(Runner PUBLIC ${LIB_PATH})
+
+FILE(CREATE_LINK ${PROJECT_SOURCE_DIR}/config.xml config.xml)
