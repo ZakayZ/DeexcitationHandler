@@ -35,7 +35,6 @@ void FermiBreakUpWrapper::BreakFragment(G4FragmentVector* fragmentsPtr, G4Fragme
     fragmentsPtr->push_back(new G4Fragment(G4int(particle.GetAtomicMass()),
                                            G4int(particle.GetChargeNumber()),
                                            G4LorentzVector(particle.GetMomentum())));
-    fragmentsPtr->back()->SetCreatorModelID(24300);
     fragmentsPtr->back()->SetCreationTime(fragment->GetCreationTime());
   }
 }
