@@ -5,4 +5,4 @@ find_package(Geant4 REQUIRED)
 find_package(CLHEP REQUIRED)
 find_package(FermiBreakUp REQUIRED)
 
-include("${CMAKE_CURRENT_LIST_DIR}/DeexcitationExport.cmake")
+include(@CMAKE_INSTALL_PREFIX@/lib/cmake/Deexcitation/DeexcitationExport.cmake)
