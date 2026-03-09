@@ -23,10 +23,10 @@
 #include <G4Electron.hh>
 
 #include <G4Evaporation.hh>
+#include <G4FermiBreakUpAN.hh>
 #include <G4PhotonEvaporation.hh>
 #include <G4StatMF.hh>
 
-#include "FermiBreakUpWrapper.h"
 #include "ExcitationHandler.h"
 
 namespace {
@@ -111,7 +111,6 @@ namespace {
   }
 } // namespace
 
-
 ExcitationHandler::ExcitationHandler()
   : multiFragmentationModel_(DefaultMultiFragmentation())
   , fermiBreakUpModel_(DefaultFermiBreakUp())
@@ -178,7 +177,7 @@ std::vector<G4ReactionProduct> ExcitationHandler::BreakItUp(const G4Fragment& fr
       auto fragmentPtr = std::unique_ptr<G4Fragment>(evaporationQueue.front());
       evaporationQueue.pop();
 
-      // infinite loopQEQ
+      // infinite loop check
       if (iterationCount == EvaporationIterationThreshold) {
         CleanUp(results, evaporationQueue, photonEvaporationQueue);
 
@@ -203,7 +202,7 @@ std::vector<G4ReactionProduct> ExcitationHandler::BreakItUp(const G4Fragment& fr
       throw std::runtime_error(ErrorNoModel);
     }
 
-    // Photon EvapPation part
+    // Photon Evaporation part
     while (!photonEvaporationQueue.empty()) {
       auto fragmentPtr = std::unique_ptr<G4Fragment>(photonEvaporationQueue.front());
       photonEvaporationQueue.pop();
@@ -230,7 +229,7 @@ std::unique_ptr<G4VMultiFragmentation> ExcitationHandler::DefaultMultiFragmentat
 }
 
 std::unique_ptr<G4VFermiBreakUp> ExcitationHandler::DefaultFermiBreakUp() {
-  auto model = std::make_unique<FermiBreakUpWrapper>();
+  auto model = std::make_unique<G4FermiBreakUpAN>();
   model->Initialise();
   return model;
 }
@@ -277,10 +276,8 @@ ExcitationHandler::Condition ExcitationHandler::DefaultMultiFragmentationConditi
 }
 
 ExcitationHandler::Condition ExcitationHandler::DefaultFermiBreakUpCondition() {
-  return [](const G4Fragment& fragment) {
-    return FermiBreakUpWrapper::IsFermiPossible(fragment.GetZ_asInt(),
-                                              fragment.GetA_asInt(),
-                                              fragment.GetExcitationEnergy());
+  return [](const G4Fragment& fragment) -> bool {
+    return fragment.GetZ_asInt() < MAX_Z && fragment.GetA_asInt() < MAX_A;
   };
 }
 

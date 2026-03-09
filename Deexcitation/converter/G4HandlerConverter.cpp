@@ -9,7 +9,7 @@ using namespace cola;
 
 namespace {
   G4Fragment ColaToG4(const cola::Particle& particle) {
-    auto [A, Z] = particle.getAZ();
+    const auto [A, Z] = particle.getAZ();
 
     return G4Fragment(
       G4int(A),
@@ -25,23 +25,18 @@ namespace {
 
   cola::Particle G4ToCola(const G4ReactionProduct& fragment) {
     return cola::Particle{
-      .position=cola::LorentzVector{
-        .t=0,
-        .x=0,
-        .y=0,
-        .z=0,
+      cola::LorentzVector{0., 0., 0., 0.};
+      cola::LorentzVector{
+        fragment.GetTotalEnergy(),
+        fragment.GetMomentum().x(),
+        fragment.GetMomentum().y(),
+        fragment.GetMomentum().z(),
       },
-      .momentum=cola::LorentzVector{
-        .e=fragment.GetTotalEnergy(),
-        .x=fragment.GetMomentum().x(),
-        .y=fragment.GetMomentum().y(),
-        .z=fragment.GetMomentum().z(),
-      },
-      .pdgCode=cola::AZToPdg({
+      cola::AZToPdg({
         static_cast<int>(fragment.GetDefinition()->GetAtomicMass()),
-        static_cast<int>(fragment.GetDefinition()->GetAtomicNumber())
+        static_cast<int>(fragment.GetDefinition()->GetAtomicNumber()),
       }),
-      .pClass=cola::ParticleClass::produced,
+      cola::ParticleClass::produced,
     };
   }
 }
@@ -51,8 +46,8 @@ G4HandlerConverter::G4HandlerConverter(std::unique_ptr<ExcitationHandler>&& mode
 std::unique_ptr<cola::EventData> G4HandlerConverter::operator()(std::unique_ptr<cola::EventData>&& data) {
   cola::EventParticles results;
   for (const auto& particle : data->particles) {
-    auto pClass = particle.pClass;
-    if (pClass == cola::ParticleClass::spectatorA or pClass == cola::ParticleClass::spectatorB) {
+    const auto pClass = particle.pClass;
+    if (pClass == cola::ParticleClass::spectatorA || pClass == cola::ParticleClass::spectatorB) {
       // apply model
       auto modelResult = model_->BreakItUp(ColaToG4(particle));
 

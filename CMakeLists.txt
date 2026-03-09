@@ -5,14 +5,10 @@ find_package(Geant4 REQUIRED)
 find_package(COLA REQUIRED)
 
 set(CMAKE_INSTALL_PREFIX ${COLA_DIR})
+set(COLA_MODULE_NAME Deexcitation)
 
 include(FetchContent)
-FetchContent_Declare(
-    FermiBreakUp
-    GIT_REPOSITORY https://github.com/ZakayZ/FermiBreakUp.git
-    GIT_TAG master
-)
-FetchContent_MakeAvailable(FermiBreakUp)
+include(GNUInstallDirs)
 
 file(GLOB SOURCES
     Deexcitation/converter/*.cpp
@@ -20,33 +16,32 @@ file(GLOB SOURCES
     Deexcitation/handler/*.cpp
 )
 
-add_library(Deexcitation ${SOURCES})
+add_library(${COLA_MODULE_NAME} SHARED ${SOURCES})
 
-target_link_libraries(Deexcitation COLA FermiBreakUp ${Geant4_LIBRARIES})
-target_include_directories(Deexcitation PUBLIC ${Geant4_INCLUDE_DIR})
+target_link_libraries(${COLA_MODULE_NAME} COLA ${Geant4_LIBRARIES})
+target_include_directories(${COLA_MODULE_NAME} PUBLIC ${Geant4_INCLUDE_DIR})
 
-target_compile_options(Deexcitation PRIVATE -Wall -Werror -Wextra -Wpedantic)
+target_compile_options(${COLA_MODULE_NAME} PRIVATE -Wall -Werror -Wextra -Wpedantic)
 
-set_property(TARGET Deexcitation PROPERTY CXX_STANDARD 20)
-set_property(TARGET Deexcitation PROPERTY CXX_STANDARD_REQUIRED On)
+target_compile_features(${COLA_MODULE_NAME} PRIVATE cxx_std_17)
 
-target_include_directories(Deexcitation PUBLIC
+target_include_directories(${COLA_MODULE_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include/Deexcitation>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/Deexcitation>
 )
 
 # Install the library and headers
-install(TARGETS Deexcitation
-    EXPORT DeexcitationExport
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include
+install(TARGETS ${COLA_MODULE_NAME}
+    EXPORT ${COLA_MODULE_NAME}Export
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(
-    DIRECTORY Deexcitation
-    DESTINATION include
+    DIRECTORY ${COLA_MODULE_NAME}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING
         PATTERN "*.h"
 )
@@ -55,24 +50,24 @@ install(
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/DeexcitationConfig.cmake
-    INSTALL_DESTINATION lib/cmake/Deexcitation
+    ${CMAKE_CURRENT_BINARY_DIR}/${COLA_MODULE_NAME}Config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${COLA_MODULE_NAME}
 )
 
 write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/DeexcitationConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/${COLA_MODULE_NAME}ConfigVersion.cmake
     VERSION ${Deexcitation_VERSION}
     COMPATIBILITY AnyNewerVersion
 )
 
 install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/DeexcitationConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/DeexcitationConfigVersion.cmake
-    DESTINATION lib/cmake/Deexcitation
+    ${CMAKE_CURRENT_BINARY_DIR}/${COLA_MODULE_NAME}Config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/${COLA_MODULE_NAME}ConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${COLA_MODULE_NAME}
 )
 
 # Export the targets
-install(EXPORT DeexcitationExport
-    FILE DeexcitationExport.cmake
-    DESTINATION lib/cmake/Deexcitation
+install(EXPORT ${COLA_MODULE_NAME}Export
+    FILE ${COLA_MODULE_NAME}Export.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${COLA_MODULE_NAME}
 )
