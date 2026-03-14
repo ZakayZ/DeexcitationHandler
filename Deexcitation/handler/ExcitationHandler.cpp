@@ -34,6 +34,20 @@ namespace {
 
   static const std::string ErrorNoModel = "no model was applied, check conditions";
 
+  class FermiBreakUpWrapper : public G4FermiBreakUpAN {
+  public:
+    using G4FermiBreakUpAN::G4FermiBreakUpAN;
+
+    void BreakFragment(G4FragmentVector* results, G4Fragment* theNucleus) override {
+      auto deletableFragment = new G4Fragment(*theNucleus);
+      auto oldSize = results->size();
+      G4FermiBreakUpAN::BreakFragment(results, deletableFragment);
+      if (oldSize == results->size()) {
+        delete deletableFragment;
+      }
+    }
+  };
+
   class DataCleaner {
   public:
     DataCleaner(G4FragmentVector& results) : results_ (results) {}
@@ -254,7 +268,7 @@ std::unique_ptr<G4VMultiFragmentation> ExcitationHandler::DefaultMultiFragmentat
 }
 
 std::unique_ptr<G4VFermiBreakUp> ExcitationHandler::DefaultFermiBreakUp() {
-  auto model = std::make_unique<G4FermiBreakUpAN>();
+  auto model = std::make_unique<FermiBreakUpWrapper>();
   model->Initialise();
   return model;
 }
@@ -351,12 +365,11 @@ void ExcitationHandler::ApplyFermiBreakUp(std::unique_ptr<G4Fragment>&& fragment
                                           G4FragmentVector& results,
                                           FragmentQueue& nextStage) {
   G4FragmentVector fragments;
-  auto fragmentPtr = fragment.release();
-  fermiBreakUpModel_->BreakFragment(&fragments, fragmentPtr);
+  fermiBreakUpModel_->BreakFragment(&fragments, fragment.get());
 
   if (fragments.size() <= 1) {
-    ClearSingularResults(fragments, fragmentPtr);
-    nextStage.emplace(fragmentPtr);
+    ClearSingularResults(fragments, fragment.get());
+    nextStage.emplace(fragment.release());
     return;
   }
 
