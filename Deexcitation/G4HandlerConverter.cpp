@@ -3,7 +3,7 @@
 
 #include "Deexcitation/handler/ExcitationHandler.h"
 
-#include "G4HandlerConverter.h"
+#include "Deexcitation/G4HandlerConverter.h"
 
 using namespace cola;
 
@@ -25,7 +25,7 @@ namespace {
 
   cola::Particle G4ToCola(const G4ReactionProduct& fragment) {
     return cola::Particle{
-      cola::LorentzVector{0., 0., 0., 0.};
+      cola::LorentzVector{0., 0., 0., 0.},
       cola::LorentzVector{
         fragment.GetTotalEnergy(),
         fragment.GetMomentum().x(),

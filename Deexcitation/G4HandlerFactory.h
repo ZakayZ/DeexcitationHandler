@@ -2,7 +2,7 @@
 
 #include <COLA.hh>
 
-#include "Deexcitation/converter/G4HandlerConverter.h"
+#include "Deexcitation/G4HandlerConverter.h"
 
 namespace cola {
 

@@ -1,5 +1,4 @@
 #pragma once
 
-#include "Deexcitation/converter/G4HandlerConverter.h"
-
-#include "Deexcitation/factory/G4HandlerFactory.h"
+#include "Deexcitation/G4HandlerConverter.h"
+#include "Deexcitation/G4HandlerFactory.h"

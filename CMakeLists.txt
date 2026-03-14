@@ -11,8 +11,7 @@ include(FetchContent)
 include(GNUInstallDirs)
 
 file(GLOB SOURCES
-    Deexcitation/converter/*.cpp
-    Deexcitation/factory/*.cpp
+    Deexcitation/*.cpp
     Deexcitation/handler/*.cpp
 )
 

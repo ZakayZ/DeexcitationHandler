@@ -9,6 +9,7 @@
 #include "G4ReactionProductVector.hh"
 #include "G4IonTable.hh"
 #include "G4DeexPrecoParameters.hh"
+#include "G4FermiPhaseDecay.hh"
 #include "G4NistManager.hh"
 
 #include "G4VMultiFragmentation.hh"
@@ -16,7 +17,20 @@
 #include "G4VFermiBreakUp.hh"
 
 class ExcitationHandler {
+ private:
+  using FragmentQueue = std::queue<std::unique_ptr<G4Fragment>>;
+
  public:
+  class NeutronDecay {
+   public:
+    NeutronDecay() = default;
+
+    void BreakFragment(G4FragmentVector& results, const G4Fragment& fragment);
+
+   private:
+    G4FermiPhaseDecay phaseSpaceDecay_;
+  };
+
   using Condition = std::function<bool(const G4Fragment&)>;
 
   ExcitationHandler();
@@ -67,6 +81,11 @@ class ExcitationHandler {
     return *this;
   }
 
+  ExcitationHandler& SetNeutronDecay(std::unique_ptr<NeutronDecay>&& model = DefaultNeutronDecay()) {
+    neutronDecayModel_ = std::move(model);
+    return *this;
+  }
+
   template <class F>
   ExcitationHandler& SetMultiFragmentationCondition(F&& f) {
     multiFragmentationCondition_ = std::forward<F>(f);
@@ -107,12 +126,26 @@ class ExcitationHandler {
     return SetPhotonEvaporationCondition(DefaultPhotonEvaporationCondition());
   }
 
-  ExcitationHandler& SetStableThreshold(Float threshold) {
+  template <class F>
+  ExcitationHandler& SetNeutronDecayCondition(F&& f) {
+    neutronDecayCondition_ = std::forward<F>(f);
+    return *this;
+  }
+
+  ExcitationHandler& SetNeutronDecayCondition() {
+    return SetNeutronDecayCondition(DefaultNeutronDecayCondition());
+  }
+
+  ExcitationHandler& SetStableThreshold(double threshold) {
     stableThreshold_ = threshold;
     return *this;
   }
 
   // parameters getters
+  std::unique_ptr<NeutronDecay>& GetNeutronDecay() { return neutronDecayModel_; }
+
+  const std::unique_ptr<NeutronDecay>& GetNeutronDecay() const { return neutronDecayModel_; }
+
   std::unique_ptr<G4VMultiFragmentation>& GetMultiFragmentation() { return multiFragmentationModel_; }
 
   const std::unique_ptr<G4VMultiFragmentation>& GetMultiFragmentation() const { return multiFragmentationModel_; }
@@ -141,7 +174,11 @@ class ExcitationHandler {
 
   const Condition& GetPhotonEvaporationCondition() const { return photonEvaporationCondition_; }
 
-  Float GetStableThreshold() const { return stableThreshold_; }
+  Condition& GetNeutronDecayCondition() { return neutronDecayCondition_; }
+
+  const Condition& GetNeutronDecayCondition() const { return neutronDecayCondition_; }
+
+  double GetStableThreshold() const { return stableThreshold_; }
 
  protected:
   // default models and conditions
@@ -153,6 +190,8 @@ class ExcitationHandler {
 
   static std::unique_ptr<G4VEvaporationChannel> DefaultPhotonEvaporation();
 
+  static std::unique_ptr<NeutronDecay> DefaultNeutronDecay();
+
   static Condition DefaultMultiFragmentationCondition();
 
   static Condition DefaultFermiBreakUpCondition();
@@ -161,35 +200,41 @@ class ExcitationHandler {
 
   static Condition DefaultPhotonEvaporationCondition();
 
+  static Condition DefaultNeutronDecayCondition();
+
   bool IsGroundState(const G4Fragment& fragment) const;
 
   bool IsStable(const G4Fragment& fragment, const G4NistManager* nist) const;
 
-  void ApplyMultiFragmentation(std::unique_ptr<G4Fragment> fragment, G4FragmentVector& results,
-                               std::queue<G4Fragment*>& nextStage);
+  void ApplyMultiFragmentation(std::unique_ptr<G4Fragment>&& fragment, G4FragmentVector& results,
+                               FragmentQueue& nextStage);
 
-  void ApplyFermiBreakUp(std::unique_ptr<G4Fragment> fragment, G4FragmentVector& results,
-                         std::queue<G4Fragment*>& nextStage);
+  void ApplyFermiBreakUp(std::unique_ptr<G4Fragment>&& fragment, G4FragmentVector& results,
+                         FragmentQueue& nextStage);
 
-  void ApplyEvaporation(std::unique_ptr<G4Fragment> fragment, G4FragmentVector& results,
-                        std::queue<G4Fragment*>& nextStage);
+  void ApplyEvaporation(std::unique_ptr<G4Fragment>&& fragment, G4FragmentVector& results,
+                        FragmentQueue& nextStage);
 
-  void ApplyPhotonEvaporation(std::unique_ptr<G4Fragment> fragment, G4FragmentVector& results);
+  void ApplyPhotonEvaporation(std::unique_ptr<G4Fragment>&& fragment, G4FragmentVector& results);
 
-  void GroupFragments(const G4FragmentVector& fragments, G4FragmentVector& results,
-                      std::queue<G4Fragment*>& nextStage);
+  void ApplyPureNeutronDecay(std::unique_ptr<G4Fragment>&& fragment, G4FragmentVector& results);
+
+  void GroupFragments(G4FragmentVector&& fragments, G4FragmentVector& results,
+                      FragmentQueue& nextStage);
 
   std::vector<G4ReactionProduct> ConvertResults(const G4FragmentVector& results);
 
   std::unique_ptr<G4VMultiFragmentation> multiFragmentationModel_;
   std::unique_ptr<G4VFermiBreakUp> fermiBreakUpModel_;
-  std::unique_ptr<G4VEvaporationChannel> photonEvaporationModel_;
   std::unique_ptr<G4VEvaporation> evaporationModel_;
+  std::unique_ptr<G4VEvaporationChannel> photonEvaporationModel_;
+  std::unique_ptr<NeutronDecay> neutronDecayModel_;
 
   Condition multiFragmentationCondition_;
   Condition fermiCondition_;
   Condition photonEvaporationCondition_;
   Condition evaporationCondition_;
+  Condition neutronDecayCondition_;
 
-  Float stableThreshold_ = 0;
+  double stableThreshold_ = 0.;
 };

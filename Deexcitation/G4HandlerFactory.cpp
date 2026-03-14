@@ -4,10 +4,9 @@
 
 #include <Randomize.hh>
 
-#include "Deexcitation/converter/G4HandlerConverter.h"
 #include "Deexcitation/handler/ExcitationHandler.h"
 
-#include "G4HandlerFactory.h"
+#include "Deexcitation/G4HandlerFactory.h"
 
 using namespace cola;
 
