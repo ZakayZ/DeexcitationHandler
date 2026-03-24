@@ -189,12 +189,12 @@ std::vector<G4ReactionProduct> ExcitationHandler::BreakItUp(const G4Fragment& fr
 
   // In case A <= 1 the fragment will not perform any nucleon emission
   auto initialFragmentPtr = std::make_unique<G4Fragment>(fragment);
-  if (IsStable(fragment, nist)) {
+  if (neutronDecayCondition_(fragment)) {
+    ApplyPureNeutronDecay(std::move(initialFragmentPtr), results);
+  } else if (IsStable(fragment, nist)) {
     results.push_back(initialFragmentPtr.release());
   } else {
-    if (neutronDecayCondition_(fragment)) {
-      ApplyPureNeutronDecay(std::move(initialFragmentPtr), results);
-    } else if (multiFragmentationCondition_(fragment)) {
+    if (multiFragmentationCondition_(fragment)) {
       ApplyMultiFragmentation(std::move(initialFragmentPtr), results, evaporationQueue);
     } else {
       evaporationQueue.emplace(initialFragmentPtr.release());
