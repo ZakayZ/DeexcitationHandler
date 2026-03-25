@@ -197,7 +197,7 @@ std::vector<G4ReactionProduct> ExcitationHandler::BreakItUp(const G4Fragment& fr
     if (multiFragmentationCondition_(fragment)) {
       ApplyMultiFragmentation(std::move(initialFragmentPtr), results, evaporationQueue);
     } else {
-      evaporationQueue.emplace(initialFragmentPtr.release());
+      evaporationQueue.emplace(std::move(initialFragmentPtr));
     }
 
     for (size_t iterationCount = 0; !evaporationQueue.empty(); ++iterationCount) {
@@ -209,6 +209,12 @@ std::vector<G4ReactionProduct> ExcitationHandler::BreakItUp(const G4Fragment& fr
         EvaporationError(fragment, *fragmentPtr, iterationCount);
         return {};
         // process is dead
+      }
+
+      // NeutronDecay part
+      if (neutronDecayCondition_(*fragmentPtr)) {
+        ApplyPureNeutronDecay(std::move(fragmentPtr), results);
+        continue;
       }
 
       // FermiBreakUp part
@@ -256,8 +262,22 @@ void ExcitationHandler::NeutronDecay::BreakFragment(G4FragmentVector& results, c
   }
 
   auto masses = std::vector<G4double>(fragment.GetA_asInt(), CLHEP::neutron_mass_c2);
+  auto momentum = fragment.GetMomentum();
+  if (const auto diff = momentum.m() - CLHEP::neutron_mass_c2 * fragment.GetA_asInt(); diff < 10. * CLHEP::eV) {
+    momentum.setE(momentum.e() + 10. * CLHEP::eV - diff);
+  }
 
-  const auto particlesMomentum = phaseSpaceDecay_.CalculateDecay(fragment.GetMomentum(), masses);
+  const auto particlesMomentum = phaseSpaceDecay_.CalculateDecay(momentum, masses);
+  if (particlesMomentum.size() == 0) {
+    std::stringstream ss;
+    ss << "NeutronDecay is unable to break particle with "
+     << "A = " << fragment.GetA_asInt()
+     << ", Z = " << fragment.GetZ_asInt()
+     << ", P = " << momentum
+    ;
+    throw std::runtime_error(ss.str());
+  }
+
   for (const auto& momentum : particlesMomentum) {
     results.emplace_back(new G4Fragment(1, 0, momentum));
   }
@@ -424,7 +444,9 @@ void ExcitationHandler::GroupFragments(G4FragmentVector&& fragments,
 
   for (auto fragmentPtr : fragments) {
     // gamma, p, n or stable nuclei
-    if (IsStable(*fragmentPtr, nist)) {
+    if (neutronDecayCondition_(*fragmentPtr)) {
+      ApplyPureNeutronDecay(std::unique_ptr<G4Fragment>(fragmentPtr), results);
+    } else if (IsStable(*fragmentPtr, nist)) {
       results.emplace_back(fragmentPtr);
     } else {
       nextStage.emplace(fragmentPtr);
