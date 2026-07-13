@@ -1,3 +1,4 @@
+#include "Deexcitation/AAMCCHandlerFactory.h"
 #include "Deexcitation/G4HandlerFactory.h"
 
 #include <CLHEP/Units/SystemOfUnits.h>
@@ -9,10 +10,18 @@
 
 namespace {
 
-  constexpr auto kPipelineConfigXml = R"(<?xml version="1.0" encoding="UTF-8" ?>
+  constexpr auto kG4PipelineConfigXml = R"(<?xml version="1.0" encoding="UTF-8" ?>
 <program>
     <generator name="generator"/>
     <converter name="G4DeexcitationHandler"/>
+    <writer name="writer"/>
+</program>
+)";
+
+  constexpr auto kAamccPipelineConfigXml = R"(<?xml version="1.0" encoding="UTF-8" ?>
+<program>
+    <generator name="generator"/>
+    <converter name="AAMCCDeexcitationHandler"/>
     <writer name="writer"/>
 </program>
 )";
@@ -78,76 +87,106 @@ namespace {
 
   void RegisterTestPipeline(cola::MetaProcessor& meta_processor,
                             std::shared_ptr<std::vector<std::unique_ptr<cola::EventData>>> sink,
-                            cola::EventParticles particles) {
+                            cola::EventParticles particles,
+                            std::unique_ptr<cola::VConverterFactory> converter_factory) {
     meta_processor.Register(std::make_unique<TestGeneratorFactory>(std::move(particles)));
-    meta_processor.Register(std::make_unique<cola::G4HandlerFactory>());
+    meta_processor.Register(std::move(converter_factory));
     meta_processor.Register(std::make_unique<TestWriterFactory>(std::move(sink)));
+  }
+
+  void RunDeexcitationTest(const std::string& pipeline_xml, std::unique_ptr<cola::VConverterFactory> converter_factory,
+                           const cola::Particle& particle) {
+    auto sink = std::make_shared<std::vector<std::unique_ptr<cola::EventData>>>();
+    cola::MetaProcessor meta_processor;
+    RegisterTestPipeline(meta_processor, sink, {particle}, std::move(converter_factory));
+    std::istringstream xml(pipeline_xml);
+    cola::ColaRunManager manager(meta_processor.Parse(xml));
+    manager.Run(1);
+
+    ASSERT_EQ(sink->size(), 1u);
+    EXPECT_GE((*sink)[0]->particles.size(), 1u);
   }
 
 }  // namespace
 
 TEST(TestModule, TestG4Handler) {
-  auto sink = std::make_shared<std::vector<std::unique_ptr<cola::EventData>>>();
+  const cola::Particle light_fragment{
+      .position = cola::LorentzVector{},
+      .momentum =
+          cola::LorentzVector{
+              .e = std::sqrt(3 * std::pow(100 * CLHEP::MeV, 2) + std::pow(4 * 938 * CLHEP::MeV, 2)),
+              .x = 100 * CLHEP::MeV,
+              .y = 100 * CLHEP::MeV,
+              .z = 100 * CLHEP::MeV,
+          },
+      .pdg_code = cola::AZToPdg({4, 2}),
+      .p_class = cola::ParticleClass::kSpectatorA,
+  };
 
-  {
-    const cola::Particle particle{
-        .position = cola::LorentzVector{},
-        .momentum =
-            cola::LorentzVector{
-                .e = std::sqrt(3 * std::pow(100 * CLHEP::MeV, 2) + std::pow(4 * 938 * CLHEP::MeV, 2)),
-                .x = 100 * CLHEP::MeV,
-                .y = 100 * CLHEP::MeV,
-                .z = 100 * CLHEP::MeV,
-            },
-        .pdg_code = cola::AZToPdg({4, 2}),
-        .p_class = cola::ParticleClass::kSpectatorA,
-    };
-    sink->clear();
-    cola::MetaProcessor mp;
-    RegisterTestPipeline(mp, sink, {particle});
-    std::istringstream xml(kPipelineConfigXml);
-    cola::ColaRunManager manager(mp.Parse(xml));
-    manager.Run(1);
+  const cola::Particle heavy_fragment{
+      .position = cola::LorentzVector{},
+      .momentum =
+          cola::LorentzVector{
+              .e = std::sqrt(3 * std::pow(100 * CLHEP::MeV, 2) + std::pow(5 * 938 * CLHEP::MeV, 2)),
+              .x = 100 * CLHEP::MeV,
+              .y = 100 * CLHEP::MeV,
+              .z = 100 * CLHEP::MeV,
+          },
+      .pdg_code = cola::AZToPdg({5, 3}),
+      .p_class = cola::ParticleClass::kSpectatorA,
+  };
 
-    ASSERT_EQ(sink->size(), 1u);
-    EXPECT_GE((*sink)[0]->particles.size(), 1u);
-  }
-
-  {
-    const cola::Particle particle{
-        .position = cola::LorentzVector{},
-        .momentum =
-            cola::LorentzVector{
-                .e = std::sqrt(3 * std::pow(100 * CLHEP::MeV, 2) + std::pow(5 * 938 * CLHEP::MeV, 2)),
-                .x = 100 * CLHEP::MeV,
-                .y = 100 * CLHEP::MeV,
-                .z = 100 * CLHEP::MeV,
-            },
-        .pdg_code = cola::AZToPdg({5, 3}),
-        .p_class = cola::ParticleClass::kSpectatorA,
-    };
-    sink->clear();
-    cola::MetaProcessor mp;
-    RegisterTestPipeline(mp, sink, {particle});
-    std::istringstream xml(kPipelineConfigXml);
-    cola::ColaRunManager manager(mp.Parse(xml));
-    manager.Run(1);
-
-    ASSERT_EQ(sink->size(), 1u);
-    EXPECT_GE((*sink)[0]->particles.size(), 1u);
-  }
+  RunDeexcitationTest(kG4PipelineConfigXml, std::make_unique<cola::G4HandlerFactory>(), light_fragment);
+  RunDeexcitationTest(kG4PipelineConfigXml, std::make_unique<cola::G4HandlerFactory>(), heavy_fragment);
 }
 
-TEST(ModuleExport, LoadCOLAModuleExposesSingleG4DeexcitationFactory) {
+TEST(TestModule, TestAamccHandler) {
+  const cola::Particle light_fragment{
+      .position = cola::LorentzVector{},
+      .momentum =
+          cola::LorentzVector{
+              .e = std::sqrt(3 * std::pow(100 * CLHEP::MeV, 2) + std::pow(4 * 938 * CLHEP::MeV, 2)),
+              .x = 100 * CLHEP::MeV,
+              .y = 100 * CLHEP::MeV,
+              .z = 100 * CLHEP::MeV,
+          },
+      .pdg_code = cola::AZToPdg({4, 2}),
+      .p_class = cola::ParticleClass::kSpectatorA,
+  };
+
+  const cola::Particle heavy_fragment{
+      .position = cola::LorentzVector{},
+      .momentum =
+          cola::LorentzVector{
+              .e = std::sqrt(3 * std::pow(100 * CLHEP::MeV, 2) + std::pow(5 * 938 * CLHEP::MeV, 2)),
+              .x = 100 * CLHEP::MeV,
+              .y = 100 * CLHEP::MeV,
+              .z = 100 * CLHEP::MeV,
+          },
+      .pdg_code = cola::AZToPdg({5, 3}),
+      .p_class = cola::ParticleClass::kSpectatorA,
+  };
+
+  RunDeexcitationTest(kAamccPipelineConfigXml, std::make_unique<cola::AAMCCHandlerFactory>(), light_fragment);
+  RunDeexcitationTest(kAamccPipelineConfigXml, std::make_unique<cola::AAMCCHandlerFactory>(), heavy_fragment);
+}
+
+TEST(ModuleExport, LoadCOLAModuleExposesDeexcitationFactories) {
   auto module = std::unique_ptr<cola::VModule>(LoadCOLAModule());
   ASSERT_NE(module, nullptr);
 
   const auto filters = module->GetModuleFilters();
-  ASSERT_EQ(filters.size(), 1u);
+  ASSERT_EQ(filters.size(), 2u);
   ASSERT_TRUE(filters.contains("G4DeexcitationHandler"));
+  ASSERT_TRUE(filters.contains("AAMCCDeexcitationHandler"));
 
-  const auto* factory = filters.at("G4DeexcitationHandler").get();
-  ASSERT_NE(factory, nullptr);
-  EXPECT_EQ(factory->GetFilterName(), "G4DeexcitationHandler");
-  EXPECT_EQ(factory->GetFilterType(), cola::FilterType::kConverter);
+  const auto* g4_factory = filters.at("G4DeexcitationHandler").get();
+  ASSERT_NE(g4_factory, nullptr);
+  EXPECT_EQ(g4_factory->GetFilterName(), "G4DeexcitationHandler");
+  EXPECT_EQ(g4_factory->GetFilterType(), cola::FilterType::kConverter);
+
+  const auto* aamcc_factory = filters.at("AAMCCDeexcitationHandler").get();
+  ASSERT_NE(aamcc_factory, nullptr);
+  EXPECT_EQ(aamcc_factory->GetFilterName(), "AAMCCDeexcitationHandler");
+  EXPECT_EQ(aamcc_factory->GetFilterType(), cola::FilterType::kConverter);
 }

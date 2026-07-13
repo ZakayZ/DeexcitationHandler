@@ -21,11 +21,40 @@ set(COLA_CMAKE_CXX_CLANG_TIDY
     CACHE STRING "Passed to CMAKE_CXX_CLANG_TIDY for ${COLA_MODULE_NAME} targets"
 )
 
-file(GLOB SOURCES CONFIGURE_DEPENDS Deexcitation/*.cpp Deexcitation/handler/*.cpp)
+file(GLOB_RECURSE AAMCC_SOURCES CONFIGURE_DEPENDS Deexcitation/aamcc/*.cc)
+file(GLOB AAMCC_WRAPPER CONFIGURE_DEPENDS Deexcitation/AAMCC*.cpp)
+
+file(
+    GLOB
+    SOURCES
+    CONFIGURE_DEPENDS
+    Deexcitation/G4*.cpp
+    Deexcitation/DeexcitationModule.cpp
+    Deexcitation/handler/*.cpp
+)
+
+add_library(AAMCCDeexcitation STATIC ${AAMCC_SOURCES} ${AAMCC_WRAPPER})
+
+target_link_libraries(AAMCCDeexcitation PUBLIC COLA ${Geant4_LIBRARIES})
+target_include_directories(AAMCCDeexcitation PUBLIC ${Geant4_INCLUDE_DIR})
+target_include_directories(
+    AAMCCDeexcitation
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/Deexcitation/aamcc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Deexcitation/aamcc/FermiBreakUp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Deexcitation/aamcc/Multifragmentation/include
+)
+target_compile_options(
+    AAMCCDeexcitation
+    PRIVATE -Wall -Wextra -Wpedantic -Wno-error=unused-variable -Wno-error=tautological-compare
+            -Wno-error=unused-parameter
+)
+target_compile_features(AAMCCDeexcitation PRIVATE cxx_std_20)
 
 add_library(${COLA_MODULE_NAME} SHARED ${SOURCES})
 
-target_link_libraries(${COLA_MODULE_NAME} PUBLIC COLA ${Geant4_LIBRARIES})
+target_link_libraries(${COLA_MODULE_NAME} PUBLIC COLA PRIVATE AAMCCDeexcitation ${Geant4_LIBRARIES})
 target_include_directories(${COLA_MODULE_NAME} PUBLIC ${Geant4_INCLUDE_DIR})
 target_compile_options(${COLA_MODULE_NAME} PRIVATE -Wall -Werror -Wextra -Wpedantic)
 target_compile_features(${COLA_MODULE_NAME} PRIVATE cxx_std_20)
